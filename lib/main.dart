@@ -1,109 +1,258 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
-void main() => runApp(new MyApp());
+import 'dart:io';
+import 'dart:async';
+import 'package:flutter_sound/flutter_sound.dart';
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return new MaterialApp(
-      title: 'Flutter Demo',
-      theme: new ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or press Run > Flutter Hot Reload in IntelliJ). Notice that the
-        // counter didn't reset back to zero; the application is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: new MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
+void main() {
+  runApp(new MyApp());
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class MyApp extends StatefulWidget {
   @override
-  _MyHomePageState createState() => new _MyHomePageState();
+  _MyAppState createState() => new _MyAppState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _MyAppState extends State<MyApp> {
+  bool _isRecording = false;
+  bool _isPlaying = false;
+  StreamSubscription _recorderSubscription;
+  StreamSubscription _playerSubscription;
+  FlutterSound flutterSound;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  String _recorderTxt = '00:00:00';
+  String _playerTxt = '00:00:00';
+
+  @override
+  void initState() {
+    super.initState();
+    flutterSound = new FlutterSound();
+    flutterSound.setSubscriptionDuration(0.01);
+  }
+
+  void startRecorder() async {
+    try {
+      String path = await flutterSound.startRecorder(null);
+      print('startRecorder: $path');
+
+      _recorderSubscription = flutterSound.onRecorderStateChanged.listen((e) {
+        DateTime date =
+            new DateTime.fromMillisecondsSinceEpoch(e.currentPosition.toInt());
+        String txt = DateFormat('mm:ss:SS', 'en_US').format(date);
+
+        this.setState(() {
+          this._recorderTxt = txt.substring(0, 8);
+        });
+      });
+
+      this.setState(() {
+        this._isRecording = true;
+      });
+    } catch (err) {
+      print('startRecorder error: $err');
+    }
+  }
+
+  void stopRecorder() async {
+    try {
+      String result = await flutterSound.stopRecorder();
+      print('stopRecorder: $result');
+
+      if (_recorderSubscription != null) {
+        _recorderSubscription.cancel();
+        _recorderSubscription = null;
+      }
+
+      this.setState(() {
+        this._isRecording = false;
+      });
+    } catch (err) {
+      print('stopRecorder error: $err');
+    }
+  }
+
+  void startPlayer() async {
+    String path = await flutterSound.startPlayer(null);
+    await flutterSound.setVolume(1.0);
+    print('startPlayer: $path');
+
+    try {
+      _playerSubscription = flutterSound.onPlayerStateChanged.listen((e) {
+        if (e != null) {
+          DateTime date = new DateTime.fromMillisecondsSinceEpoch(
+              e.currentPosition.toInt());
+          String txt = DateFormat('mm:ss:SS', 'en_US').format(date);
+          this.setState(() {
+            this._isPlaying = true;
+            this._playerTxt = txt.substring(0, 8);
+          });
+        }
+      });
+    } catch (err) {
+      print('error: $err');
+    }
+  }
+
+  void stopPlayer() async {
+    try {
+      String result = await flutterSound.stopPlayer();
+      print('stopPlayer: $result');
+      if (_playerSubscription != null) {
+        _playerSubscription.cancel();
+        _playerSubscription = null;
+      }
+
+      this.setState(() {
+        this._isPlaying = false;
+      });
+    } catch (err) {
+      print('error: $err');
+    }
+  }
+
+  void pausePlayer() async {
+    String result = await flutterSound.pausePlayer();
+    print('pausePlayer: $result');
+  }
+
+  void resumePlayer() async {
+    String result = await flutterSound.resumePlayer();
+    print('resumePlayer: $result');
+  }
+
+  void seekToPlayer(int milliSecs) async {
+    int secs = Platform.isIOS ? milliSecs / 1000 : milliSecs;
+
+    String result = await flutterSound.seekToPlayer(secs);
+    print('seekToPlayer: $result');
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return new Scaffold(
-      appBar: new AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: new Text(widget.title),
-      ),
-      body: new Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: new Column(
-          // Column is also layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug paint" (press "p" in the console where you ran
-          // "flutter run", or select "Toggle Debug Paint" from the Flutter tool
-          // window in IntelliJ) to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Flutter Sound'),
+        ),
+        body: ListView(
           children: <Widget>[
-            new Text(
-              'You have pushed the button this many times:',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  margin: EdgeInsets.only(top: 24.0, bottom: 16.0),
+                  child: Text(
+                    this._recorderTxt,
+                    style: TextStyle(
+                      fontSize: 48.0,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            new Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display1,
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 56.0,
+                  height: 56.0,
+                  child: ClipOval(
+                    child: FlatButton(
+                      onPressed: () {
+                        if (!this._isRecording) {
+                          return this.startRecorder();
+                        }
+                        this.stopRecorder();
+                      },
+                      padding: EdgeInsets.all(8.0),
+                      child: Image(
+                        image: this._isRecording
+                            ? AssetImage('assets/ic_stop.png')
+                            : AssetImage('assets/ic_mic.png'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  margin: EdgeInsets.only(top: 60.0, bottom: 16.0),
+                  child: Text(
+                    this._playerTxt,
+                    style: TextStyle(
+                      fontSize: 48.0,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 56.0,
+                  height: 56.0,
+                  child: ClipOval(
+                    child: FlatButton(
+                      onPressed: () {
+                        startPlayer();
+                      },
+                      padding: EdgeInsets.all(8.0),
+                      child: Image(
+                        image: AssetImage('assets/ic_play.png'),
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 56.0,
+                  height: 56.0,
+                  child: ClipOval(
+                    child: FlatButton(
+                      onPressed: () {
+                        pausePlayer();
+                      },
+                      padding: EdgeInsets.all(8.0),
+                      child: Image(
+                        width: 36.0,
+                        height: 36.0,
+                        image: AssetImage('assets/ic_pause.png'),
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 56.0,
+                  height: 56.0,
+                  child: ClipOval(
+                    child: FlatButton(
+                      onPressed: () {
+                        stopPlayer();
+                      },
+                      padding: EdgeInsets.all(8.0),
+                      child: Image(
+                        width: 28.0,
+                        height: 28.0,
+                        image: AssetImage('assets/ic_stop.png'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
             ),
           ],
         ),
       ),
-      floatingActionButton: new FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: new Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
