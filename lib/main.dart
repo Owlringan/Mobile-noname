@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' show DateFormat;
-
-import 'dart:io';
-import 'dart:async';
 import 'package:flutter_sound/flutter_sound.dart';
 
 void main() {
@@ -15,7 +11,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  FlutterSound flutterSound;
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
